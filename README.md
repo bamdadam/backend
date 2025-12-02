@@ -193,7 +193,7 @@ The GraphQL API must support the following operations:
 
 ---
 
-## 4. Authentication
+## 3. Authentication
 
 All API requests must include a header:
 
@@ -208,7 +208,7 @@ The application must:
 
 ---
 
-## 6. End-to-End Test
+## 4. End-to-End Test
 
 The project must include at least one end-to-end (E2E) test that:
 
@@ -216,7 +216,7 @@ The project must include at least one end-to-end (E2E) test that:
 - Interacts with the **real GraphQL API**
 - Covers **at minimum two different queries** of the GraphQL API
 
-## 7. Stack
+## 5. Stack
 
 The GraphQL API must be implemented using ([gqlgen](https://github.com/99designs/gqlgen))
 
