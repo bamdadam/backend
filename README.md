@@ -19,7 +19,7 @@ After creation, verify that it is running with:
 docker compose exec postgres psql -U postgres -d technical_assessment -c "SELECT COUNT(*) FROM elements;"
 ```
 
-You should see a count of 3700 elements.
+You should see a count of 4200 elements.
 
 ## 2. Build the Go tools
 
