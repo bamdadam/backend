@@ -1,4 +1,4 @@
-module github.com/example/ds-technical-assessment
+module github.com/bamdadam/backend
 
 go 1.24.0
 
