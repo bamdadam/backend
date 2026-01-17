@@ -8,7 +8,7 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/example/ds-technical-assessment/src/server"
+	"github.com/bamdadam/backend/src/server"
 	_ "github.com/lib/pq"
 )
 
@@ -36,7 +36,7 @@ func main() {
 
 	serverCtx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
-	
+
 	addr := ":8080"
 	log.Printf("Server starting on %s", addr)
 	if err := server.Run(serverCtx, db, addr); err != nil {
