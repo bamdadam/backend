@@ -1,0 +1,126 @@
+# GraphQL schema example
+#
+# https://gqlgen.com/getting-started/
+type Element {
+  uri: ID!
+  title: String!
+  type: Type!
+  space: Space!
+  creationDate: DateTime!
+  author: User!
+  fieldValues: [ElementFieldValue!]!
+}
+
+type ElementFieldValue {
+  uri: ID!
+  value: Any!
+  field: Field!
+}
+
+type Field {
+  uri: ID!
+  name: String!
+  fieldType: FieldType!
+  type: Type!
+  creationDate: DateTime!
+  author: User!
+  options: String
+  required: Boolean!
+}
+
+type Type {
+  uri: ID!
+  name: String!
+  space: Space!
+  creationDate: DateTime!
+  author: User!
+}
+
+type Space {
+  uri: ID!
+  name: String!
+  tenant: Tenant!
+  creationDate: DateTime!
+}
+
+type Tenant {
+  uri: ID!
+  name: String!
+  status: TenantStatus!
+  creationDate: DateTime!
+}
+
+type User {
+  uri: ID!
+  email: String!
+  displayName: String!
+}
+
+enum FieldType {
+  TEXT
+  NUMBER
+  DATE
+  BOOLEAN
+  SELECT
+  MULTI_SELECT
+  URL
+  EMAIL
+}
+
+enum TenantStatus {
+  ACTIVE
+  INACTIVE
+}
+
+type PageInfo {
+  hasNextPage: Boolean!
+  hasPreviousPage: Boolean!
+  startCursor: String
+  endCursor: String
+}
+
+type ElementConnection {
+  edges: [ElementEdge!]!
+  pageInfo: PageInfo!
+  totalCount: Int!
+}
+
+type ElementEdge {
+  cursor: String!
+  node: Element!
+}
+
+input FieldValueFilter {
+  fieldUri: ID!
+  value: String!
+}
+
+input UpdateElementTitleInput {
+  uri: ID!
+  title: String!
+}
+
+scalar DateTime
+scalar Any
+
+type Query {
+  element(uri: ID!): Element!
+  elements(
+    first: Int
+    after: String
+    last: Int
+    before: String
+    typeUri: ID
+    spaceUri: ID
+    fieldValueFilter: FieldValueFilter
+  ): ElementConnection!
+}
+
+type Mutation {
+  updateElementTitle(input: UpdateElementTitleInput!): Element!
+}
+
+type Subscription {
+  elementUpdated(uri: ID!): Element!
+  elementCreated: Element!
+}
