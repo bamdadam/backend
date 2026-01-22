@@ -48,18 +48,18 @@ type Field struct {
 }
 
 type FieldValueFilter struct {
-	FieldURI string `json:"fieldUri"`
-	Value    string `json:"value"`
+	FieldURI  string         `json:"fieldUri"`
+	Value     string         `json:"value"`
+	ValueType FieldValueType `json:"valueType"`
 }
 
 type Mutation struct {
 }
 
 type PageInfo struct {
-	HasNextPage     bool    `json:"hasNextPage"`
-	HasPreviousPage bool    `json:"hasPreviousPage"`
-	StartCursor     *string `json:"startCursor,omitempty"`
-	EndCursor       *string `json:"endCursor,omitempty"`
+	HasNextPage bool    `json:"hasNextPage"`
+	StartCursor *string `json:"startCursor,omitempty"`
+	EndCursor   *string `json:"endCursor,omitempty"`
 }
 
 type Query struct {
@@ -163,6 +163,67 @@ func (e *FieldType) UnmarshalJSON(b []byte) error {
 }
 
 func (e FieldType) MarshalJSON() ([]byte, error) {
+	var buf bytes.Buffer
+	e.MarshalGQL(&buf)
+	return buf.Bytes(), nil
+}
+
+type FieldValueType string
+
+const (
+	FieldValueTypeText    FieldValueType = "TEXT"
+	FieldValueTypeNumber  FieldValueType = "NUMBER"
+	FieldValueTypeDate    FieldValueType = "DATE"
+	FieldValueTypeBoolean FieldValueType = "BOOLEAN"
+	FieldValueTypeJSON    FieldValueType = "JSON"
+)
+
+var AllFieldValueType = []FieldValueType{
+	FieldValueTypeText,
+	FieldValueTypeNumber,
+	FieldValueTypeDate,
+	FieldValueTypeBoolean,
+	FieldValueTypeJSON,
+}
+
+func (e FieldValueType) IsValid() bool {
+	switch e {
+	case FieldValueTypeText, FieldValueTypeNumber, FieldValueTypeDate, FieldValueTypeBoolean, FieldValueTypeJSON:
+		return true
+	}
+	return false
+}
+
+func (e FieldValueType) String() string {
+	return string(e)
+}
+
+func (e *FieldValueType) UnmarshalGQL(v any) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = FieldValueType(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid FieldValueType", str)
+	}
+	return nil
+}
+
+func (e FieldValueType) MarshalGQL(w io.Writer) {
+	fmt.Fprint(w, strconv.Quote(e.String()))
+}
+
+func (e *FieldValueType) UnmarshalJSON(b []byte) error {
+	s, err := strconv.Unquote(string(b))
+	if err != nil {
+		return err
+	}
+	return e.UnmarshalGQL(s)
+}
+
+func (e FieldValueType) MarshalJSON() ([]byte, error) {
 	var buf bytes.Buffer
 	e.MarshalGQL(&buf)
 	return buf.Bytes(), nil

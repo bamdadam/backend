@@ -74,7 +74,6 @@ enum TenantStatus {
 
 type PageInfo {
   hasNextPage: Boolean!
-  hasPreviousPage: Boolean!
   startCursor: String
   endCursor: String
 }
@@ -90,9 +89,18 @@ type ElementEdge {
   node: Element!
 }
 
+enum FieldValueType {
+  TEXT
+  NUMBER
+  DATE
+  BOOLEAN
+  JSON
+}
+
 input FieldValueFilter {
   fieldUri: ID!
   value: String!
+  valueType: FieldValueType!
 }
 
 input UpdateElementTitleInput {
@@ -106,10 +114,9 @@ scalar Any
 type Query {
   element(uri: ID!): Element!
   elements(
-    first: Int
+    limit: Int
     after: String
-    last: Int
-    before: String
+
     typeUri: ID
     spaceUri: ID
     fieldValueFilter: FieldValueFilter
@@ -122,5 +129,4 @@ type Mutation {
 
 type Subscription {
   elementUpdated(uri: ID!): Element!
-  elementCreated: Element!
 }

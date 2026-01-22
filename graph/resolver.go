@@ -1,12 +1,15 @@
 package graph
 
-import "database/sql"
+import (
+	"github.com/bamdadam/backend/src/pubsub"
+	"github.com/bamdadam/backend/src/repository"
+)
 
 // This file will not be regenerated automatically.
 //
-// It serves as dependency injection for your app, add any dependencies you require
-// here.
+// It serves as dependency injection for your app, add any dependencies you require here.
 
 type Resolver struct {
-	DB *sql.DB
+	ElementRepo   repository.ElementRepository
+	ElementPubSub *pubsub.ElementPubSub
 }

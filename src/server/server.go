@@ -13,7 +13,10 @@ import (
 	"github.com/99designs/gqlgen/graphql/handler/extension"
 	"github.com/99designs/gqlgen/graphql/handler/lru"
 	"github.com/99designs/gqlgen/graphql/handler/transport"
+	"github.com/99designs/gqlgen/graphql/playground"
 	"github.com/bamdadam/backend/graph"
+	"github.com/bamdadam/backend/src/pubsub"
+	"github.com/bamdadam/backend/src/repository"
 	"github.com/vektah/gqlparser/v2/ast"
 )
 
@@ -22,10 +25,11 @@ func Run(ctx context.Context, db *sql.DB, addr string) error {
 	graphqlHandler := newGraphQLHandler(db)
 	healthHandler := newHealthHandler(db)
 
+	http.Handle("/", playground.Handler("GraphQL Playground", "/graphql"))
 	http.Handle("/graphql", graphqlHandler)
 	http.Handle("/health", healthHandler)
 
-	log.Printf("GraphQL endpoint available at http://localhost%s/graphql", addr)
+	log.Printf("GraphQL playground: http://localhost%s/", addr)
 
 	server := &http.Server{
 		Addr: addr,
@@ -47,9 +51,19 @@ func Run(ctx context.Context, db *sql.DB, addr string) error {
 }
 
 func newGraphQLHandler(db *sql.DB) http.Handler {
+	userRepo := repository.NewUserRepository(db)
+	tenantRepo := repository.NewTenantRepository(db)
+	spaceRepo := repository.NewSpaceRepository(db, tenantRepo)
+	typeRepo := repository.NewTypeRepository(db, spaceRepo, userRepo)
+	fieldRepo := repository.NewFieldRepository(db, typeRepo, userRepo)
+	fieldValueRepo := repository.NewElementFieldValueRepository(db, fieldRepo)
+	elementRepo := repository.NewElementRepository(db, typeRepo, spaceRepo, userRepo, fieldValueRepo)
+
 	resolver := &graph.Resolver{
-		DB: db,
+		ElementRepo:   elementRepo,
+		ElementPubSub: pubsub.NewElementPubSub(),
 	}
+
 	srv := handler.New(graph.NewExecutableSchema(
 		graph.Config{Resolvers: resolver}),
 	)

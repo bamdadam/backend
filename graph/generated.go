@@ -91,15 +91,14 @@ type ComplexityRoot struct {
 	}
 
 	PageInfo struct {
-		EndCursor       func(childComplexity int) int
-		HasNextPage     func(childComplexity int) int
-		HasPreviousPage func(childComplexity int) int
-		StartCursor     func(childComplexity int) int
+		EndCursor   func(childComplexity int) int
+		HasNextPage func(childComplexity int) int
+		StartCursor func(childComplexity int) int
 	}
 
 	Query struct {
 		Element  func(childComplexity int, uri string) int
-		Elements func(childComplexity int, first *int32, after *string, last *int32, before *string, typeURI *string, spaceURI *string, fieldValueFilter *model.FieldValueFilter) int
+		Elements func(childComplexity int, limit *int32, after *string, typeURI *string, spaceURI *string, fieldValueFilter *model.FieldValueFilter) int
 	}
 
 	Space struct {
@@ -110,7 +109,6 @@ type ComplexityRoot struct {
 	}
 
 	Subscription struct {
-		ElementCreated func(childComplexity int) int
 		ElementUpdated func(childComplexity int, uri string) int
 	}
 
@@ -141,11 +139,10 @@ type MutationResolver interface {
 }
 type QueryResolver interface {
 	Element(ctx context.Context, uri string) (*model.Element, error)
-	Elements(ctx context.Context, first *int32, after *string, last *int32, before *string, typeURI *string, spaceURI *string, fieldValueFilter *model.FieldValueFilter) (*model.ElementConnection, error)
+	Elements(ctx context.Context, limit *int32, after *string, typeURI *string, spaceURI *string, fieldValueFilter *model.FieldValueFilter) (*model.ElementConnection, error)
 }
 type SubscriptionResolver interface {
 	ElementUpdated(ctx context.Context, uri string) (<-chan *model.Element, error)
-	ElementCreated(ctx context.Context) (<-chan *model.Element, error)
 }
 
 type executableSchema struct {
@@ -334,12 +331,6 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.PageInfo.HasNextPage(childComplexity), true
-	case "PageInfo.hasPreviousPage":
-		if e.complexity.PageInfo.HasPreviousPage == nil {
-			break
-		}
-
-		return e.complexity.PageInfo.HasPreviousPage(childComplexity), true
 	case "PageInfo.startCursor":
 		if e.complexity.PageInfo.StartCursor == nil {
 			break
@@ -368,7 +359,7 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 			return 0, false
 		}
 
-		return e.complexity.Query.Elements(childComplexity, args["first"].(*int32), args["after"].(*string), args["last"].(*int32), args["before"].(*string), args["typeUri"].(*string), args["spaceUri"].(*string), args["fieldValueFilter"].(*model.FieldValueFilter)), true
+		return e.complexity.Query.Elements(childComplexity, args["limit"].(*int32), args["after"].(*string), args["typeUri"].(*string), args["spaceUri"].(*string), args["fieldValueFilter"].(*model.FieldValueFilter)), true
 
 	case "Space.creationDate":
 		if e.complexity.Space.CreationDate == nil {
@@ -395,12 +386,6 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.complexity.Space.URI(childComplexity), true
 
-	case "Subscription.elementCreated":
-		if e.complexity.Subscription.ElementCreated == nil {
-			break
-		}
-
-		return e.complexity.Subscription.ElementCreated(childComplexity), true
 	case "Subscription.elementUpdated":
 		if e.complexity.Subscription.ElementUpdated == nil {
 			break
@@ -667,41 +652,31 @@ func (ec *executionContext) field_Query_element_args(ctx context.Context, rawArg
 func (ec *executionContext) field_Query_elements_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
-	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "first", ec.unmarshalOInt2ᚖint32)
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "limit", ec.unmarshalOInt2ᚖint32)
 	if err != nil {
 		return nil, err
 	}
-	args["first"] = arg0
+	args["limit"] = arg0
 	arg1, err := graphql.ProcessArgField(ctx, rawArgs, "after", ec.unmarshalOString2ᚖstring)
 	if err != nil {
 		return nil, err
 	}
 	args["after"] = arg1
-	arg2, err := graphql.ProcessArgField(ctx, rawArgs, "last", ec.unmarshalOInt2ᚖint32)
+	arg2, err := graphql.ProcessArgField(ctx, rawArgs, "typeUri", ec.unmarshalOID2ᚖstring)
 	if err != nil {
 		return nil, err
 	}
-	args["last"] = arg2
-	arg3, err := graphql.ProcessArgField(ctx, rawArgs, "before", ec.unmarshalOString2ᚖstring)
+	args["typeUri"] = arg2
+	arg3, err := graphql.ProcessArgField(ctx, rawArgs, "spaceUri", ec.unmarshalOID2ᚖstring)
 	if err != nil {
 		return nil, err
 	}
-	args["before"] = arg3
-	arg4, err := graphql.ProcessArgField(ctx, rawArgs, "typeUri", ec.unmarshalOID2ᚖstring)
+	args["spaceUri"] = arg3
+	arg4, err := graphql.ProcessArgField(ctx, rawArgs, "fieldValueFilter", ec.unmarshalOFieldValueFilter2ᚖgithubᚗcomᚋbamdadamᚋbackendᚋgraphᚋmodelᚐFieldValueFilter)
 	if err != nil {
 		return nil, err
 	}
-	args["typeUri"] = arg4
-	arg5, err := graphql.ProcessArgField(ctx, rawArgs, "spaceUri", ec.unmarshalOID2ᚖstring)
-	if err != nil {
-		return nil, err
-	}
-	args["spaceUri"] = arg5
-	arg6, err := graphql.ProcessArgField(ctx, rawArgs, "fieldValueFilter", ec.unmarshalOFieldValueFilter2ᚖgithubᚗcomᚋbamdadamᚋbackendᚋgraphᚋmodelᚐFieldValueFilter)
-	if err != nil {
-		return nil, err
-	}
-	args["fieldValueFilter"] = arg6
+	args["fieldValueFilter"] = arg4
 	return args, nil
 }
 
@@ -1070,8 +1045,6 @@ func (ec *executionContext) fieldContext_ElementConnection_pageInfo(_ context.Co
 			switch field.Name {
 			case "hasNextPage":
 				return ec.fieldContext_PageInfo_hasNextPage(ctx, field)
-			case "hasPreviousPage":
-				return ec.fieldContext_PageInfo_hasPreviousPage(ctx, field)
 			case "startCursor":
 				return ec.fieldContext_PageInfo_startCursor(ctx, field)
 			case "endCursor":
@@ -1629,35 +1602,6 @@ func (ec *executionContext) fieldContext_PageInfo_hasNextPage(_ context.Context,
 	return fc, nil
 }
 
-func (ec *executionContext) _PageInfo_hasPreviousPage(ctx context.Context, field graphql.CollectedField, obj *model.PageInfo) (ret graphql.Marshaler) {
-	return graphql.ResolveField(
-		ctx,
-		ec.OperationContext,
-		field,
-		ec.fieldContext_PageInfo_hasPreviousPage,
-		func(ctx context.Context) (any, error) {
-			return obj.HasPreviousPage, nil
-		},
-		nil,
-		ec.marshalNBoolean2bool,
-		true,
-		true,
-	)
-}
-
-func (ec *executionContext) fieldContext_PageInfo_hasPreviousPage(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "PageInfo",
-		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type Boolean does not have child fields")
-		},
-	}
-	return fc, nil
-}
-
 func (ec *executionContext) _PageInfo_startCursor(ctx context.Context, field graphql.CollectedField, obj *model.PageInfo) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -1781,7 +1725,7 @@ func (ec *executionContext) _Query_elements(ctx context.Context, field graphql.C
 		ec.fieldContext_Query_elements,
 		func(ctx context.Context) (any, error) {
 			fc := graphql.GetFieldContext(ctx)
-			return ec.resolvers.Query().Elements(ctx, fc.Args["first"].(*int32), fc.Args["after"].(*string), fc.Args["last"].(*int32), fc.Args["before"].(*string), fc.Args["typeUri"].(*string), fc.Args["spaceUri"].(*string), fc.Args["fieldValueFilter"].(*model.FieldValueFilter))
+			return ec.resolvers.Query().Elements(ctx, fc.Args["limit"].(*int32), fc.Args["after"].(*string), fc.Args["typeUri"].(*string), fc.Args["spaceUri"].(*string), fc.Args["fieldValueFilter"].(*model.FieldValueFilter))
 		},
 		nil,
 		ec.marshalNElementConnection2ᚖgithubᚗcomᚋbamdadamᚋbackendᚋgraphᚋmodelᚐElementConnection,
@@ -2109,51 +2053,6 @@ func (ec *executionContext) fieldContext_Subscription_elementUpdated(ctx context
 	if fc.Args, err = ec.field_Subscription_elementUpdated_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _Subscription_elementCreated(ctx context.Context, field graphql.CollectedField) (ret func(ctx context.Context) graphql.Marshaler) {
-	return graphql.ResolveFieldStream(
-		ctx,
-		ec.OperationContext,
-		field,
-		ec.fieldContext_Subscription_elementCreated,
-		func(ctx context.Context) (any, error) {
-			return ec.resolvers.Subscription().ElementCreated(ctx)
-		},
-		nil,
-		ec.marshalNElement2ᚖgithubᚗcomᚋbamdadamᚋbackendᚋgraphᚋmodelᚐElement,
-		true,
-		true,
-	)
-}
-
-func (ec *executionContext) fieldContext_Subscription_elementCreated(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "Subscription",
-		Field:      field,
-		IsMethod:   true,
-		IsResolver: true,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			switch field.Name {
-			case "uri":
-				return ec.fieldContext_Element_uri(ctx, field)
-			case "title":
-				return ec.fieldContext_Element_title(ctx, field)
-			case "type":
-				return ec.fieldContext_Element_type(ctx, field)
-			case "space":
-				return ec.fieldContext_Element_space(ctx, field)
-			case "creationDate":
-				return ec.fieldContext_Element_creationDate(ctx, field)
-			case "author":
-				return ec.fieldContext_Element_author(ctx, field)
-			case "fieldValues":
-				return ec.fieldContext_Element_fieldValues(ctx, field)
-			}
-			return nil, fmt.Errorf("no field named %q was found under type Element", field.Name)
-		},
 	}
 	return fc, nil
 }
@@ -3977,7 +3876,7 @@ func (ec *executionContext) unmarshalInputFieldValueFilter(ctx context.Context, 
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"fieldUri", "value"}
+	fieldsInOrder := [...]string{"fieldUri", "value", "valueType"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -3998,6 +3897,13 @@ func (ec *executionContext) unmarshalInputFieldValueFilter(ctx context.Context, 
 				return it, err
 			}
 			it.Value = data
+		case "valueType":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("valueType"))
+			data, err := ec.unmarshalNFieldValueType2githubᚗcomᚋbamdadamᚋbackendᚋgraphᚋmodelᚐFieldValueType(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.ValueType = data
 		}
 	}
 
@@ -4393,11 +4299,6 @@ func (ec *executionContext) _PageInfo(ctx context.Context, sel ast.SelectionSet,
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
-		case "hasPreviousPage":
-			out.Values[i] = ec._PageInfo_hasPreviousPage(ctx, field, obj)
-			if out.Values[i] == graphql.Null {
-				out.Invalids++
-			}
 		case "startCursor":
 			out.Values[i] = ec._PageInfo_startCursor(ctx, field, obj)
 		case "endCursor":
@@ -4588,8 +4489,6 @@ func (ec *executionContext) _Subscription(ctx context.Context, sel ast.Selection
 	switch fields[0].Name {
 	case "elementUpdated":
 		return ec._Subscription_elementUpdated(ctx, fields[0])
-	case "elementCreated":
-		return ec._Subscription_elementCreated(ctx, fields[0])
 	default:
 		panic("unknown field " + strconv.Quote(fields[0].Name))
 	}
@@ -5299,6 +5198,16 @@ func (ec *executionContext) unmarshalNFieldType2githubᚗcomᚋbamdadamᚋbacken
 }
 
 func (ec *executionContext) marshalNFieldType2githubᚗcomᚋbamdadamᚋbackendᚋgraphᚋmodelᚐFieldType(ctx context.Context, sel ast.SelectionSet, v model.FieldType) graphql.Marshaler {
+	return v
+}
+
+func (ec *executionContext) unmarshalNFieldValueType2githubᚗcomᚋbamdadamᚋbackendᚋgraphᚋmodelᚐFieldValueType(ctx context.Context, v any) (model.FieldValueType, error) {
+	var res model.FieldValueType
+	err := res.UnmarshalGQL(v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalNFieldValueType2githubᚗcomᚋbamdadamᚋbackendᚋgraphᚋmodelᚐFieldValueType(ctx context.Context, sel ast.SelectionSet, v model.FieldValueType) graphql.Marshaler {
 	return v
 }
 
