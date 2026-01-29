@@ -2,11 +2,11 @@ package repository
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
 	"fmt"
 
 	"github.com/bamdadam/backend/graph/model"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type ElementFieldValueRepository interface {
@@ -14,11 +14,11 @@ type ElementFieldValueRepository interface {
 }
 
 type elementFieldValueRepository struct {
-	db    *sql.DB
+	db    *pgxpool.Pool
 	field FieldRepository
 }
 
-func NewElementFieldValueRepository(db *sql.DB, field FieldRepository) ElementFieldValueRepository {
+func NewElementFieldValueRepository(db *pgxpool.Pool, field FieldRepository) ElementFieldValueRepository {
 	return &elementFieldValueRepository{db: db, field: field}
 }
 
@@ -29,7 +29,7 @@ func (r *elementFieldValueRepository) GetByElementURI(ctx context.Context, eleme
 		WHERE element_uri = $1
 	`
 
-	rows, err := r.db.QueryContext(ctx, query, elementURI)
+	rows, err := r.db.Query(ctx, query, elementURI)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get element field values: %w", err)
 	}
@@ -39,10 +39,10 @@ func (r *elementFieldValueRepository) GetByElementURI(ctx context.Context, eleme
 	for rows.Next() {
 		var fv model.ElementFieldValue
 		var fieldURI string
-		var valueText, valueJSON sql.NullString
-		var valueNumber sql.NullFloat64
-		var valueDate sql.NullInt64
-		var valueBool sql.NullBool
+		var valueText, valueJSON *string
+		var valueNumber *float64
+		var valueDate *int64
+		var valueBool *bool
 
 		if err := rows.Scan(
 			&fv.URI, &fieldURI, &valueText, &valueNumber, &valueDate, &valueBool, &valueJSON,
@@ -71,30 +71,30 @@ func (r *elementFieldValueRepository) GetByElementURI(ctx context.Context, eleme
 }
 
 func (r *elementFieldValueRepository) extractValue(
-	valueText sql.NullString,
-	valueNumber sql.NullFloat64,
-	valueDate sql.NullInt64,
-	valueBool sql.NullBool,
-	valueJSON sql.NullString,
+	valueText *string,
+	valueNumber *float64,
+	valueDate *int64,
+	valueBool *bool,
+	valueJSON *string,
 ) interface{} {
-	if valueText.Valid {
-		return valueText.String
+	if valueText != nil {
+		return *valueText
 	}
-	if valueNumber.Valid {
-		return valueNumber.Float64
+	if valueNumber != nil {
+		return *valueNumber
 	}
-	if valueDate.Valid {
-		return valueDate.Int64
+	if valueDate != nil {
+		return *valueDate
 	}
-	if valueBool.Valid {
-		return valueBool.Bool
+	if valueBool != nil {
+		return *valueBool
 	}
-	if valueJSON.Valid {
+	if valueJSON != nil {
 		var jsonValue interface{}
-		if err := json.Unmarshal([]byte(valueJSON.String), &jsonValue); err == nil {
+		if err := json.Unmarshal([]byte(*valueJSON), &jsonValue); err == nil {
 			return jsonValue
 		}
-		return valueJSON.String
+		return *valueJSON
 	}
 	return nil
 }

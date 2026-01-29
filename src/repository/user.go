@@ -2,11 +2,12 @@ package repository
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"fmt"
 
 	"github.com/bamdadam/backend/graph/model"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type UserRepository interface {
@@ -15,10 +16,10 @@ type UserRepository interface {
 }
 
 type userRepository struct {
-	db *sql.DB
+	db *pgxpool.Pool
 }
 
-func NewUserRepository(db *sql.DB) UserRepository {
+func NewUserRepository(db *pgxpool.Pool) UserRepository {
 	return &userRepository{db: db}
 }
 
@@ -26,10 +27,10 @@ func (r *userRepository) GetByURI(ctx context.Context, uri string) (*model.User,
 	query := `SELECT uri, email, display_name FROM users WHERE uri = $1`
 
 	var user model.User
-	err := r.db.QueryRowContext(ctx, query, uri).Scan(
+	err := r.db.QueryRow(ctx, query, uri).Scan(
 		&user.URI, &user.Email, &user.DisplayName,
 	)
-	if errors.Is(err, sql.ErrNoRows) {
+	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, fmt.Errorf("user not found: %s", uri)
 	}
 	if err != nil {
@@ -43,10 +44,10 @@ func (r *userRepository) GetByEmail(ctx context.Context, email string) (*model.U
 	query := `SELECT uri, email, display_name FROM users WHERE email = $1`
 
 	var user model.User
-	err := r.db.QueryRowContext(ctx, query, email).Scan(
+	err := r.db.QueryRow(ctx, query, email).Scan(
 		&user.URI, &user.Email, &user.DisplayName,
 	)
-	if errors.Is(err, sql.ErrNoRows) {
+	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, fmt.Errorf("user not found with email: %s", email)
 	}
 	if err != nil {

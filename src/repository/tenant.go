@@ -2,13 +2,14 @@ package repository
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"fmt"
 	"strconv"
 	"strings"
 
 	"github.com/bamdadam/backend/graph/model"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type TenantRepository interface {
@@ -16,10 +17,10 @@ type TenantRepository interface {
 }
 
 type tenantRepository struct {
-	db *sql.DB
+	db *pgxpool.Pool
 }
 
-func NewTenantRepository(db *sql.DB) TenantRepository {
+func NewTenantRepository(db *pgxpool.Pool) TenantRepository {
 	return &tenantRepository{db: db}
 }
 
@@ -30,10 +31,10 @@ func (r *tenantRepository) GetByURI(ctx context.Context, uri string) (*model.Ten
 	var status string
 	var creationDate int64
 
-	err := r.db.QueryRowContext(ctx, query, uri).Scan(
+	err := r.db.QueryRow(ctx, query, uri).Scan(
 		&tenant.URI, &tenant.Name, &status, &creationDate,
 	)
-	if errors.Is(err, sql.ErrNoRows) {
+	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, fmt.Errorf("tenant not found: %s", uri)
 	}
 	if err != nil {

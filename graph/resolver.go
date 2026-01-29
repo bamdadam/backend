@@ -2,7 +2,7 @@ package graph
 
 import (
 	"github.com/bamdadam/backend/src/pubsub"
-	"github.com/bamdadam/backend/src/repository"
+	"github.com/bamdadam/backend/src/service"
 )
 
 // This file will not be regenerated automatically.
@@ -10,6 +10,6 @@ import (
 // It serves as dependency injection for your app, add any dependencies you require here.
 
 type Resolver struct {
-	ElementRepo   repository.ElementRepository
-	ElementPubSub *pubsub.ElementPubSub
+	ElementService *service.ElementService
+	ElementPubSub  *pubsub.ElementPubSub
 }

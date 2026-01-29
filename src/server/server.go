@@ -2,7 +2,6 @@ package server
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
 	"errors"
 	"log"
@@ -15,18 +14,20 @@ import (
 	"github.com/99designs/gqlgen/graphql/handler/transport"
 	"github.com/99designs/gqlgen/graphql/playground"
 	"github.com/bamdadam/backend/graph"
+	"github.com/bamdadam/backend/src/middleware"
 	"github.com/bamdadam/backend/src/pubsub"
 	"github.com/bamdadam/backend/src/repository"
+	"github.com/bamdadam/backend/src/service"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/vektah/gqlparser/v2/ast"
 )
 
-// Run initializes and starts the GraphQL server
-func Run(ctx context.Context, db *sql.DB, addr string) error {
+func Run(ctx context.Context, db *pgxpool.Pool, addr string) error {
 	graphqlHandler := newGraphQLHandler(db)
 	healthHandler := newHealthHandler(db)
 
 	http.Handle("/", playground.Handler("GraphQL Playground", "/graphql"))
-	http.Handle("/graphql", graphqlHandler)
+	http.Handle("/graphql", middleware.Auth(graphqlHandler))
 	http.Handle("/health", healthHandler)
 
 	log.Printf("GraphQL playground: http://localhost%s/", addr)
@@ -50,18 +51,21 @@ func Run(ctx context.Context, db *sql.DB, addr string) error {
 	return server.Shutdown(shutdownCtx)
 }
 
-func newGraphQLHandler(db *sql.DB) http.Handler {
+func newGraphQLHandler(db *pgxpool.Pool) http.Handler {
 	userRepo := repository.NewUserRepository(db)
 	tenantRepo := repository.NewTenantRepository(db)
 	spaceRepo := repository.NewSpaceRepository(db, tenantRepo)
 	typeRepo := repository.NewTypeRepository(db, spaceRepo, userRepo)
 	fieldRepo := repository.NewFieldRepository(db, typeRepo, userRepo)
 	fieldValueRepo := repository.NewElementFieldValueRepository(db, fieldRepo)
-	elementRepo := repository.NewElementRepository(db, typeRepo, spaceRepo, userRepo, fieldValueRepo)
+	userSpaceRepo := repository.NewUserSpacesRepository(db)
+	elementRepo := repository.NewElementRepository(db, typeRepo, spaceRepo, userRepo, fieldValueRepo, userSpaceRepo)
+
+	elementService := service.NewElementService(db, elementRepo)
 
 	resolver := &graph.Resolver{
-		ElementRepo:   elementRepo,
-		ElementPubSub: pubsub.NewElementPubSub(),
+		ElementService: elementService,
+		ElementPubSub:  pubsub.NewElementPubSub(),
 	}
 
 	srv := handler.New(graph.NewExecutableSchema(
@@ -83,9 +87,9 @@ func newGraphQLHandler(db *sql.DB) http.Handler {
 	})
 }
 
-func newHealthHandler(db *sql.DB) http.HandlerFunc {
+func newHealthHandler(db *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if err := db.Ping(); err != nil {
+		if err := db.Ping(r.Context()); err != nil {
 			writeJSON(w, http.StatusServiceUnavailable, map[string]string{
 				"status":   "unhealthy",
 				"postgres": "disconnected",

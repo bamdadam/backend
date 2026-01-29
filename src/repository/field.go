@@ -2,13 +2,14 @@ package repository
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"fmt"
 	"strconv"
 	"strings"
 
 	"github.com/bamdadam/backend/graph/model"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type FieldRepository interface {
@@ -16,12 +17,12 @@ type FieldRepository interface {
 }
 
 type fieldRepository struct {
-	db       *sql.DB
+	db       *pgxpool.Pool
 	typeRepo TypeRepository
 	user     UserRepository
 }
 
-func NewFieldRepository(db *sql.DB, typeRepo TypeRepository, user UserRepository) FieldRepository {
+func NewFieldRepository(db *pgxpool.Pool, typeRepo TypeRepository, user UserRepository) FieldRepository {
 	return &fieldRepository{db: db, typeRepo: typeRepo, user: user}
 }
 
@@ -31,12 +32,12 @@ func (r *fieldRepository) GetByURI(ctx context.Context, uri string) (*model.Fiel
 	var field model.Field
 	var fieldTypeStr, typeURI, authorURI string
 	var creationDate int64
-	var options sql.NullString
+	var options *string
 
-	err := r.db.QueryRowContext(ctx, query, uri).Scan(
+	err := r.db.QueryRow(ctx, query, uri).Scan(
 		&field.URI, &field.Name, &fieldTypeStr, &typeURI, &creationDate, &authorURI, &options, &field.Required,
 	)
-	if errors.Is(err, sql.ErrNoRows) {
+	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, fmt.Errorf("field not found: %s", uri)
 	}
 	if err != nil {
@@ -45,9 +46,7 @@ func (r *fieldRepository) GetByURI(ctx context.Context, uri string) (*model.Fiel
 
 	field.FieldType = model.FieldType(strings.ToUpper(fieldTypeStr))
 	field.CreationDate = strconv.FormatInt(creationDate, 10)
-	if options.Valid {
-		field.Options = &options.String
-	}
+	field.Options = options
 
 	fieldType, err := r.typeRepo.GetByURI(ctx, typeURI)
 	if err != nil {

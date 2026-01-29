@@ -2,12 +2,13 @@ package repository
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"fmt"
 	"strconv"
 
 	"github.com/bamdadam/backend/graph/model"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type SpaceRepository interface {
@@ -15,11 +16,11 @@ type SpaceRepository interface {
 }
 
 type spaceRepository struct {
-	db     *sql.DB
+	db     *pgxpool.Pool
 	tenant TenantRepository
 }
 
-func NewSpaceRepository(db *sql.DB, tenant TenantRepository) SpaceRepository {
+func NewSpaceRepository(db *pgxpool.Pool, tenant TenantRepository) SpaceRepository {
 	return &spaceRepository{db: db, tenant: tenant}
 }
 
@@ -30,10 +31,10 @@ func (r *spaceRepository) GetByURI(ctx context.Context, uri string) (*model.Spac
 	var tenantURI string
 	var creationDate int64
 
-	err := r.db.QueryRowContext(ctx, query, uri).Scan(
+	err := r.db.QueryRow(ctx, query, uri).Scan(
 		&space.URI, &space.Name, &creationDate, &tenantURI,
 	)
-	if errors.Is(err, sql.ErrNoRows) {
+	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, fmt.Errorf("space not found: %s", uri)
 	}
 	if err != nil {

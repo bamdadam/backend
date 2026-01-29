@@ -3885,21 +3885,21 @@ func (ec *executionContext) unmarshalInputFieldValueFilter(ctx context.Context, 
 		switch k {
 		case "fieldUri":
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("fieldUri"))
-			data, err := ec.unmarshalNID2string(ctx, v)
+			data, err := ec.unmarshalOID2ᚖstring(ctx, v)
 			if err != nil {
 				return it, err
 			}
 			it.FieldURI = data
 		case "value":
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("value"))
-			data, err := ec.unmarshalNString2string(ctx, v)
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
 			if err != nil {
 				return it, err
 			}
 			it.Value = data
 		case "valueType":
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("valueType"))
-			data, err := ec.unmarshalNFieldValueType2githubᚗcomᚋbamdadamᚋbackendᚋgraphᚋmodelᚐFieldValueType(ctx, v)
+			data, err := ec.unmarshalOFieldValueType2ᚖgithubᚗcomᚋbamdadamᚋbackendᚋgraphᚋmodelᚐFieldValueType(ctx, v)
 			if err != nil {
 				return it, err
 			}
@@ -5201,16 +5201,6 @@ func (ec *executionContext) marshalNFieldType2githubᚗcomᚋbamdadamᚋbackend�
 	return v
 }
 
-func (ec *executionContext) unmarshalNFieldValueType2githubᚗcomᚋbamdadamᚋbackendᚋgraphᚋmodelᚐFieldValueType(ctx context.Context, v any) (model.FieldValueType, error) {
-	var res model.FieldValueType
-	err := res.UnmarshalGQL(v)
-	return res, graphql.ErrorOnPath(ctx, err)
-}
-
-func (ec *executionContext) marshalNFieldValueType2githubᚗcomᚋbamdadamᚋbackendᚋgraphᚋmodelᚐFieldValueType(ctx context.Context, sel ast.SelectionSet, v model.FieldValueType) graphql.Marshaler {
-	return v
-}
-
 func (ec *executionContext) unmarshalNID2string(ctx context.Context, v any) (string, error) {
 	res, err := graphql.UnmarshalID(v)
 	return res, graphql.ErrorOnPath(ctx, err)
@@ -5613,6 +5603,22 @@ func (ec *executionContext) unmarshalOFieldValueFilter2ᚖgithubᚗcomᚋbamdada
 	}
 	res, err := ec.unmarshalInputFieldValueFilter(ctx, v)
 	return &res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) unmarshalOFieldValueType2ᚖgithubᚗcomᚋbamdadamᚋbackendᚋgraphᚋmodelᚐFieldValueType(ctx context.Context, v any) (*model.FieldValueType, error) {
+	if v == nil {
+		return nil, nil
+	}
+	var res = new(model.FieldValueType)
+	err := res.UnmarshalGQL(v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalOFieldValueType2ᚖgithubᚗcomᚋbamdadamᚋbackendᚋgraphᚋmodelᚐFieldValueType(ctx context.Context, sel ast.SelectionSet, v *model.FieldValueType) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return v
 }
 
 func (ec *executionContext) unmarshalOID2ᚖstring(ctx context.Context, v any) (*string, error) {

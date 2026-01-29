@@ -2,35 +2,33 @@ package main
 
 import (
 	"context"
-	"database/sql"
 	"log"
 	"os"
 	"os/signal"
 	"syscall"
 
 	"github.com/bamdadam/backend/src/server"
-	_ "github.com/lib/pq"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-var db *sql.DB
-
 func main() {
-	// Get database connection string from environment or use default
+	ctx := context.Background()
+
+	// GetByUser database connection string from environment or use default
 	connStr := os.Getenv("DATABASE_URL")
 	if connStr == "" {
 		connStr = "postgres://postgres:postgres@localhost:5432/technical_assessment?sslmode=disable"
 	}
 
 	// Initialize PostgreSQL connection
-	var err error
-	db, err = sql.Open("postgres", connStr)
+	db, err := pgxpool.New(ctx, connStr)
 	if err != nil {
 		log.Fatalf("Failed to connect to PostgreSQL: %v", err)
 	}
 	defer db.Close()
 
 	// Verify connection
-	if err := db.Ping(); err != nil {
+	if err := db.Ping(ctx); err != nil {
 		log.Fatalf("Failed to ping PostgreSQL: %v", err)
 	}
 

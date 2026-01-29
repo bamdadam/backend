@@ -48,9 +48,9 @@ type Field struct {
 }
 
 type FieldValueFilter struct {
-	FieldURI  string         `json:"fieldUri"`
-	Value     string         `json:"value"`
-	ValueType FieldValueType `json:"valueType"`
+	FieldURI  *string         `json:"fieldUri,omitempty"`
+	Value     *string         `json:"value,omitempty"`
+	ValueType *FieldValueType `json:"valueType,omitempty"`
 }
 
 type Mutation struct {

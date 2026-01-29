@@ -2,35 +2,44 @@ package repository
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
+	"slices"
 	"strconv"
 
 	"github.com/bamdadam/backend/graph/model"
+	models "github.com/bamdadam/backend/src/model"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-var PaginationLimit int32 = 20
+type loadRelationParams struct {
+	typeURI,
+	spaceURI,
+	authorURI string
+}
 
 type ElementRepository interface {
-	GetByURI(ctx context.Context, uri string) (*model.Element, error)
-	List(ctx context.Context, params ListParams) (*model.ElementConnection, error)
-	UpdateTitle(ctx context.Context, uri string, title string) (*model.Element, error)
+	GetByURI(ctx context.Context, uri, userID string) (*model.Element, error)
+	List(ctx context.Context, params models.ListParams, userID string) (*model.ElementConnection, error)
+	UpdateTitle(ctx context.Context, uri, title, userID string) (*model.Element, error)
 }
 
 type elementRepository struct {
-	db         *sql.DB
+	db         *pgxpool.Pool
 	typeRepo   TypeRepository
 	space      SpaceRepository
 	user       UserRepository
 	fieldValue ElementFieldValueRepository
+	userSpace  UserSpacesRepository
 }
 
 func NewElementRepository(
-	db *sql.DB,
+	db *pgxpool.Pool,
 	typeRepo TypeRepository,
 	space SpaceRepository,
 	user UserRepository,
 	fieldValue ElementFieldValueRepository,
+	userSpace UserSpacesRepository,
 ) ElementRepository {
 	return &elementRepository{
 		db:         db,
@@ -38,20 +47,30 @@ func NewElementRepository(
 		space:      space,
 		user:       user,
 		fieldValue: fieldValue,
+		userSpace:  userSpace,
 	}
 }
 
-func (r *elementRepository) GetByURI(ctx context.Context, uri string) (*model.Element, error) {
+func (r *elementRepository) GetByURI(ctx context.Context, uri, userID string) (*model.Element, error) {
+	userSpaces, err := r.userSpace.GetByUser(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(userSpaces) == 0 {
+		return nil, nil
+	}
+	// todo handle elements was not found regardless that user had permission to see the space logic
 	query := `
 		SELECT uri, title, type_uri, space_uri, creation_date, author
-		FROM elements WHERE uri = $1
+		FROM elements WHERE uri = $1 AND space_uri = ANY($2)
 	`
 
 	var elem model.Element
 	var typeURI, spaceURI, authorURI string
 	var creationDate int64
 
-	err := r.db.QueryRowContext(ctx, query, uri).Scan(
+	err = r.db.QueryRow(ctx, query, uri, userSpaces).Scan(
 		&elem.URI, &elem.Title, &typeURI, &spaceURI, &creationDate, &authorURI,
 	)
 	if err != nil {
@@ -60,90 +79,122 @@ func (r *elementRepository) GetByURI(ctx context.Context, uri string) (*model.El
 
 	elem.CreationDate = strconv.FormatInt(creationDate, 10)
 
-	if err := r.loadRelations(ctx, &elem, typeURI, spaceURI, authorURI); err != nil {
+	if err = r.loadRelations(ctx, &elem,
+		loadRelationParams{
+			typeURI:   typeURI,
+			authorURI: authorURI,
+			spaceURI:  spaceURI,
+		}); err != nil {
 		return nil, err
 	}
 
 	return &elem, nil
 }
 
-type ListParams struct {
-	Limit            int32
-	After            *string
-	TypeURI          *string
-	SpaceURI         *string
-	FieldValueFilter *model.FieldValueFilter
-}
-
-func (r *elementRepository) List(ctx context.Context, params ListParams) (*model.ElementConnection, error) {
-	limit := params.Limit
-	if limit <= 0 {
-		limit = PaginationLimit
+func (r *elementRepository) List(ctx context.Context, params models.ListParams, userID string) (*model.ElementConnection, error) {
+	userSpaces, err := r.userSpace.GetByUser(ctx, userID)
+	if err != nil {
+		return nil, err
 	}
 
-	query, args, err := r.buildListQuery(params, limit)
+	if len(userSpaces) == 0 {
+		return nil, nil
+	}
+	// todo handle multiple space or type filter
+	if params.SpaceURI != nil {
+		if !slices.Contains(userSpaces, *params.SpaceURI) {
+			params.SpaceURI = nil
+		}
+	}
+
+	query, args, err := r.buildListQuery(params)
 	if err != nil {
 		return nil, fmt.Errorf("failed to build list query elements: %w", err)
 	}
-	rows, err := r.db.QueryContext(ctx, query, args...)
+
+	rows, err := r.db.Query(ctx, query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list elements: %w", err)
 	}
-	defer rows.Close()
 
+	var uri, title, typeURI, spaceURI, authorURI string
+	var creationDate int64
 	var elements []*model.Element
-	for rows.Next() {
-		elem, typeURI, spaceURI, authorURI, err := r.scanElementRow(rows)
-		if err != nil {
-			return nil, err
-		}
-		if err := r.loadRelations(ctx, elem, typeURI, spaceURI, authorURI); err != nil {
-			return nil, err
-		}
-		elements = append(elements, elem)
-	}
 
-	if err := rows.Err(); err != nil {
+	_, err = pgx.ForEachRow(rows,
+		[]any{
+			&uri,
+			&title,
+			&typeURI,
+			&spaceURI,
+			&creationDate,
+			&authorURI},
+		func() error {
+			var elem model.Element
+			elem.CreationDate = strconv.FormatInt(creationDate, 10)
+			elem.URI = uri
+			elem.Title = title
+
+			if err = r.loadRelations(ctx, &elem,
+				loadRelationParams{
+					typeURI:   typeURI,
+					authorURI: authorURI,
+					spaceURI:  spaceURI,
+				}); err != nil {
+				return err
+			}
+
+			elements = append(elements, &elem)
+			return nil
+		})
+
+	if err != nil {
 		return nil, fmt.Errorf("error iterating elements: %w", err)
 	}
 
-	hasNextPage := len(elements) > int(limit)
+	hasNextPage := len(elements) > int(params.Limit)
 	if hasNextPage {
-		elements = elements[:limit]
+		elements = elements[:params.Limit]
 	}
 
 	return r.buildConnection(elements, hasNextPage), nil
 }
 
-func (r *elementRepository) UpdateTitle(ctx context.Context, uri string, title string) (*model.Element, error) {
-	result, err := r.db.ExecContext(ctx, `UPDATE elements SET title = $1 WHERE uri = $2`, title, uri)
+func (r *elementRepository) UpdateTitle(ctx context.Context, uri string, title string, userID string) (*model.Element, error) {
+	result, err := r.db.Exec(ctx, `UPDATE elements SET title = $1 WHERE uri = $2`, title, uri)
 	if err != nil {
 		return nil, fmt.Errorf("failed to update element title: %w", err)
 	}
 
-	rowsAffected, _ := result.RowsAffected()
-	if rowsAffected == 0 {
+	if result.RowsAffected() == 0 {
 		return nil, fmt.Errorf("element not found: %s", uri)
 	}
 
-	return r.GetByURI(ctx, uri)
+	return r.GetByURI(ctx, uri, userID)
 }
 
-func (r *elementRepository) buildListQuery(params ListParams, limit int32) (string, []interface{}, error) {
+func (r *elementRepository) buildListQuery(params models.ListParams) (string, []interface{}, error) {
 	query := `SELECT e.uri, e.title, e.type_uri, e.space_uri, e.creation_date, e.author FROM elements e`
 	var conditions []string
 	var args []interface{}
 	argIdx := 1
 
 	if params.FieldValueFilter != nil {
-		col, val, err := r.getFilterColumnAndValue(params.FieldValueFilter)
-		if err != nil {
-			return "", nil, err
+		query += fmt.Sprintf(` JOIN element_field_values efv ON e.uri = efv.element_uri`)
+		if params.FieldValueFilter.FieldURI != nil {
+			query += fmt.Sprintf(` AND efv.field_uri = $%d`, argIdx)
+			args = append(args, params.FieldValueFilter.FieldURI)
+			argIdx++
 		}
-		query += fmt.Sprintf(` JOIN element_field_values efv ON e.uri = efv.element_uri
-			AND efv.field_uri = $%d AND efv.%s = $%d`, argIdx, col, argIdx+1)
-		args = append(args, params.FieldValueFilter.FieldURI, val)
-		argIdx += 2
+		if params.FieldValueFilter.Value != nil && params.FieldValueFilter.ValueType != nil {
+			col, val, err := r.getFilterColumnAndValue(params.FieldValueFilter)
+			if err != nil {
+				return "", nil, err
+			}
+			query += fmt.Sprintf(` AND efv.%s = $%d`, col, argIdx)
+			args = append(args, val)
+			argIdx++
+		}
 	}
 
 	if params.TypeURI != nil {
@@ -175,38 +226,25 @@ func (r *elementRepository) buildListQuery(params ListParams, limit int32) (stri
 	}
 
 	query += fmt.Sprintf(" ORDER BY e.uri ASC LIMIT $%d", argIdx)
-	args = append(args, limit+1)
+	args = append(args, params.Limit+1)
 
 	return query, args, nil
 }
 
-func (r *elementRepository) scanElementRow(rows *sql.Rows) (*model.Element, string, string, string, error) {
-	var elem model.Element
-	var typeURI, spaceURI, authorURI string
-	var creationDate int64
-
-	if err := rows.Scan(&elem.URI, &elem.Title, &typeURI, &spaceURI, &creationDate, &authorURI); err != nil {
-		return nil, "", "", "", fmt.Errorf("failed to scan element: %w", err)
-	}
-
-	elem.CreationDate = strconv.FormatInt(creationDate, 10)
-	return &elem, typeURI, spaceURI, authorURI, nil
-}
-
-func (r *elementRepository) loadRelations(ctx context.Context, elem *model.Element, typeURI, spaceURI, authorURI string) error {
+func (r *elementRepository) loadRelations(ctx context.Context, elem *model.Element, params loadRelationParams) error {
 	var err error
 
-	elem.Type, err = r.typeRepo.GetByURI(ctx, typeURI)
+	elem.Type, err = r.typeRepo.GetByURI(ctx, params.typeURI)
 	if err != nil {
 		return fmt.Errorf("failed to get type: %w", err)
 	}
 
-	elem.Space, err = r.space.GetByURI(ctx, spaceURI)
+	elem.Space, err = r.space.GetByURI(ctx, params.spaceURI)
 	if err != nil {
 		return fmt.Errorf("failed to get space: %w", err)
 	}
 
-	elem.Author, err = r.user.GetByURI(ctx, authorURI)
+	elem.Author, err = r.user.GetByURI(ctx, params.authorURI)
 	if err != nil {
 		return fmt.Errorf("failed to get author: %w", err)
 	}
@@ -245,30 +283,30 @@ func (r *elementRepository) buildConnection(elements []*model.Element, hasNextPa
 }
 
 func (r *elementRepository) getFilterColumnAndValue(filter *model.FieldValueFilter) (string, interface{}, error) {
-	switch filter.ValueType {
+	switch *filter.ValueType {
 	case model.FieldValueTypeText:
-		return "value_text", filter.Value, nil
+		return "value_text", *filter.Value, nil
 	case model.FieldValueTypeNumber:
-		num, err := strconv.ParseFloat(filter.Value, 64)
+		num, err := strconv.ParseFloat(*filter.Value, 64)
 		if err != nil {
 			return "", nil, fmt.Errorf("invalid number value: %w", err)
 		}
 		return "value_number", num, nil
 	case model.FieldValueTypeDate:
-		date, err := strconv.ParseInt(filter.Value, 10, 64)
+		date, err := strconv.ParseInt(*filter.Value, 10, 64)
 		if err != nil {
 			return "", nil, fmt.Errorf("invalid date value: %w", err)
 		}
 		return "value_date", date, nil
 	case model.FieldValueTypeBoolean:
-		b, err := strconv.ParseBool(filter.Value)
+		b, err := strconv.ParseBool(*filter.Value)
 		if err != nil {
 			return "", nil, fmt.Errorf("invalid boolean value: %w", err)
 		}
 		return "value_boolean", b, nil
 	case model.FieldValueTypeJSON:
-		return "value_json", filter.Value, nil
+		return "value_json", *filter.Value, nil
 	default:
-		return "", nil, fmt.Errorf("unknown value type: %s", filter.ValueType)
+		return "", nil, fmt.Errorf("unknown value type: %s", *filter.ValueType)
 	}
 }

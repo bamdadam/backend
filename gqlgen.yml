@@ -25,12 +25,12 @@ exec:
 #   options:
 #     computed_requires: true
 
-# Where should any generated models go?
+# Where should any generated model go?
 model:
   filename: graph/model/models_gen.go
   package: model
 
-  # Optional: Pass in a path to a new gotpl template to use for generating the models
+  # Optional: Pass in a path to a new gotpl template to use for generating the model
   # model_template: [your/path/model.gotpl]
 
 # Where should the resolver implementations go?
@@ -52,7 +52,7 @@ resolver:
   # Optional: turn on to avoid rewriting existing resolver(s) when generating
   # preserve_resolver: false
 
-# Optional: turn on use ` + "`" + `gqlgen:"fieldName"` + "`" + ` tags in your models
+# Optional: turn on use ` + "`" + `gqlgen:"fieldName"` + "`" + ` tags in your model
 # struct_tag: json
 
 # Optional: turn on to use []Thing instead of []*Thing
@@ -70,10 +70,10 @@ resolver:
 # Optional: turn on to exclude the gqlgen version in the generated file notice. No effect if `omit_gqlgen_file_notice` is true.
 # omit_gqlgen_version_in_file_notice: false
 
-# Optional: turn on to exclude root models such as Query and Mutation from the generated models file.
+# Optional: turn on to exclude root model such as Query and Mutation from the generated model file.
 # omit_root_models: false
 
-# Optional: turn on to exclude resolver fields from the generated models file.
+# Optional: turn on to exclude resolver fields from the generated model file.
 # omit_resolver_fields: false
 
 # Optional: turn off to make struct-type struct fields not use pointers

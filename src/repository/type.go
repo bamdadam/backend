@@ -2,12 +2,13 @@ package repository
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"fmt"
 	"strconv"
 
 	"github.com/bamdadam/backend/graph/model"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type TypeRepository interface {
@@ -15,12 +16,12 @@ type TypeRepository interface {
 }
 
 type typeRepository struct {
-	db    *sql.DB
+	db    *pgxpool.Pool
 	space SpaceRepository
 	user  UserRepository
 }
 
-func NewTypeRepository(db *sql.DB, space SpaceRepository, user UserRepository) TypeRepository {
+func NewTypeRepository(db *pgxpool.Pool, space SpaceRepository, user UserRepository) TypeRepository {
 	return &typeRepository{db: db, space: space, user: user}
 }
 
@@ -31,29 +32,27 @@ func (r *typeRepository) GetByURI(ctx context.Context, uri string) (*model.Type,
 	var spaceURI, authorURI string
 	var creationDate int64
 
-	err := r.db.QueryRowContext(ctx, query, uri).Scan(
+	err := r.db.QueryRow(ctx, query, uri).Scan(
 		&t.URI, &t.Name, &spaceURI, &creationDate, &authorURI,
 	)
-	if errors.Is(err, sql.ErrNoRows) {
-		return nil, fmt.Errorf("type not found: %s", uri)
-	}
 	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, fmt.Errorf("type not found: %s", uri)
+		}
 		return nil, fmt.Errorf("failed to get type: %w", err)
 	}
 
 	t.CreationDate = strconv.FormatInt(creationDate, 10)
 
-	space, err := r.space.GetByURI(ctx, spaceURI)
+	t.Space, err = r.space.GetByURI(ctx, spaceURI)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get space for type: %w", err)
 	}
-	t.Space = space
 
-	author, err := r.user.GetByURI(ctx, authorURI)
+	t.Author, err = r.user.GetByURI(ctx, authorURI)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get author for type: %w", err)
 	}
-	t.Author = author
 
 	return &t, nil
 }
