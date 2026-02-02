@@ -76,7 +76,6 @@ func NewGraphQLHandler(db *pgxpool.Pool) http.Handler {
 		graph.Config{Resolvers: resolver}),
 	)
 	srv.AddTransport(transport.Options{})
-	srv.AddTransport(transport.GET{})
 	srv.AddTransport(transport.POST{})
 	srv.AddTransport(transport.Websocket{
 		KeepAlivePingInterval: 15 * time.Second,
@@ -93,12 +92,8 @@ func NewGraphQLHandler(db *pgxpool.Pool) http.Handler {
 			log.Printf("WebSocket Error: %v", err)
 		},
 	})
-	srv.SetQueryCache(lru.New[*ast.QueryDocument](1000))
-
+	srv.SetQueryCache(lru.New[*ast.QueryDocument](100))
 	srv.Use(extension.Introspection{})
-	srv.Use(extension.AutomaticPersistedQuery{
-		Cache: lru.New[string](100),
-	})
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		srv.ServeHTTP(w, r)
