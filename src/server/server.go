@@ -15,6 +15,7 @@ import (
 	"github.com/99designs/gqlgen/graphql/playground"
 	"github.com/bamdadam/backend/graph"
 	"github.com/bamdadam/backend/src/middleware"
+	"github.com/bamdadam/backend/src/model"
 	"github.com/bamdadam/backend/src/pubsub"
 	"github.com/bamdadam/backend/src/repository"
 	"github.com/bamdadam/backend/src/service"
@@ -77,7 +78,21 @@ func NewGraphQLHandler(db *pgxpool.Pool) http.Handler {
 	srv.AddTransport(transport.Options{})
 	srv.AddTransport(transport.GET{})
 	srv.AddTransport(transport.POST{})
-	srv.AddTransport(transport.Websocket{})
+	srv.AddTransport(transport.Websocket{
+		KeepAlivePingInterval: 15 * time.Second,
+		InitFunc: func(ctx context.Context, initPayload transport.InitPayload) (context.Context, *transport.InitPayload, error) {
+			userID := initPayload.GetString(middleware.AuthHeader)
+			if userID == "" {
+				return ctx, nil, errors.New("missing X-User-ID in websocket connection_init payload")
+			}
+
+			ctx = context.WithValue(ctx, model.UserIDKey, userID)
+			return ctx, nil, nil
+		},
+		ErrorFunc: func(ctx context.Context, err error) {
+			log.Printf("WebSocket Error: %v", err)
+		},
+	})
 	srv.SetQueryCache(lru.New[*ast.QueryDocument](1000))
 
 	srv.Use(extension.Introspection{})
