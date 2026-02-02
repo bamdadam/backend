@@ -70,6 +70,9 @@ func (r *elementFieldValueRepository) GetByElementURI(ctx context.Context, eleme
 	return fieldValues, nil
 }
 
+// extractValue checks which of the value fields in the database has a value
+// and extracts that value, this function assumes the data at the database level
+// is always correct and only one value type is present.
 func (r *elementFieldValueRepository) extractValue(
 	valueText *string,
 	valueNumber *float64,

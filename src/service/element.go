@@ -69,6 +69,9 @@ func (s *ElementService) UpdateTitle(ctx context.Context, uri, title string) (*m
 	return elem, nil
 }
 
+// validateFieldValueFilter validates FieldValueFilter value and valueType fields
+// by checking if they are both present or not present at the same time and if only
+// one of them is present, returns an error
 func (s *ElementService) validateFieldValueFilter(filter *model.FieldValueFilter) error {
 	if filter != nil &&
 		((filter.Value != nil && filter.ValueType == nil) ||
