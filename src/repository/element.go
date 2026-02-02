@@ -51,6 +51,9 @@ func NewElementRepository(
 	}
 }
 
+// GetByURI retrieves a single element by its URI, if the user has access to the element's space.
+// Returns nil if the user has no accessible spaces. Returns an error if the element is not found
+// or if the user lacks permission to access the element's space.
 func (r *elementRepository) GetByURI(ctx context.Context, uri, userID string) (*model.Element, error) {
 	userSpaces, err := r.userSpace.GetByUser(ctx, userID)
 	if err != nil {
@@ -78,7 +81,7 @@ func (r *elementRepository) GetByURI(ctx context.Context, uri, userID string) (*
 	}
 
 	elem.CreationDate = strconv.FormatInt(creationDate, 10)
-
+	// todo handle loading relations in service layer and decouple repositories from each other
 	if err = r.loadRelations(ctx, &elem,
 		loadRelationParams{
 			typeURI:   typeURI,
@@ -91,6 +94,9 @@ func (r *elementRepository) GetByURI(ctx context.Context, uri, userID string) (*
 	return &elem, nil
 }
 
+// List retrieves a paginated list of elements the user has access to based on their space permissions.
+// Supports filtering by type URI, space URI, and field values. Returns nil if the user has no accessible spaces.
+// If a space filter is provided but the user lacks access, the filter is ignored.
 func (r *elementRepository) List(ctx context.Context, params models.ListParams, userID string) (*model.ElementConnection, error) {
 	userSpaces, err := r.userSpace.GetByUser(ctx, userID)
 	if err != nil {
@@ -134,7 +140,7 @@ func (r *elementRepository) List(ctx context.Context, params models.ListParams, 
 			elem.CreationDate = strconv.FormatInt(creationDate, 10)
 			elem.URI = uri
 			elem.Title = title
-
+			// todo handle loading relations in service layer and decouple repositories from each other
 			if err = r.loadRelations(ctx, &elem,
 				loadRelationParams{
 					typeURI:   typeURI,
@@ -173,6 +179,9 @@ func (r *elementRepository) UpdateTitle(ctx context.Context, uri string, title s
 	return r.GetByURI(ctx, uri, userID)
 }
 
+// buildListQuery constructs a dynamic SQL query for listing elements based on the provided filter parameters.
+// Supports filtering by type URI, space URI, field values, and cursor-based pagination.
+// Returns the query string, positional arguments, and any error encountered during query construction.
 func (r *elementRepository) buildListQuery(params models.ListParams) (string, []interface{}, error) {
 	query := `SELECT e.uri, e.title, e.type_uri, e.space_uri, e.creation_date, e.author FROM elements e`
 	var conditions []string
@@ -257,6 +266,8 @@ func (r *elementRepository) loadRelations(ctx context.Context, elem *model.Eleme
 	return nil
 }
 
+// buildConnection transforms a slice of elements into a GraphQL-compliant connection structure
+// with edges, cursors, and pagination info. Each element's URI is used as its cursor.
 func (r *elementRepository) buildConnection(elements []*model.Element, hasNextPage bool) *model.ElementConnection {
 	edges := make([]*model.ElementEdge, len(elements))
 	for i, elem := range elements {
@@ -282,6 +293,9 @@ func (r *elementRepository) buildConnection(elements []*model.Element, hasNextPa
 	}
 }
 
+// getFilterColumnAndValue maps a FieldValueFilter to the appropriate database column name and
+// parsed value based on the filter's value type. Handles TEXT, NUMBER, DATE, BOOLEAN, and JSON types.
+// Returns the column name, converted value, and any parsing error.
 func (r *elementRepository) getFilterColumnAndValue(filter *model.FieldValueFilter) (string, interface{}, error) {
 	switch *filter.ValueType {
 	case model.FieldValueTypeText:
