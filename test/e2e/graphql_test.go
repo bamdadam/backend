@@ -474,3 +474,65 @@ func TestMissingAuthHeader(t *testing.T) {
 		t.Errorf("Expected status 401, got %d", resp.StatusCode)
 	}
 }
+
+func TestUpdateElementTitleMutation(t *testing.T) {
+	mutation := `
+		mutation UpdateElementTitle($input: UpdateElementTitleInput!) {
+			updateElementTitle(input: $input) {
+				uri
+				title
+			}
+		}
+	`
+
+	newTitle := "Updated Test Title via Mutation"
+	resp := executeGraphQL(t, mutation, map[string]any{
+		"input": map[string]any{
+			"uri":   "element:test-2",
+			"title": newTitle,
+		},
+	})
+
+	if len(resp.Errors) > 0 {
+		t.Fatalf("GraphQL errors: %v", resp.Errors)
+	}
+
+	data := struct {
+		UpdateElementTitle *model.Element `json:"updateElementTitle"`
+	}{}
+
+	if err := json.Unmarshal(resp.Data, &data); err != nil {
+		t.Fatalf("Failed to unmarshal data: %v", err)
+	}
+
+	if data.UpdateElementTitle.URI != "element:test-2" {
+		t.Errorf("Expected URI 'element:test-2', got %q", data.UpdateElementTitle.URI)
+	}
+
+	if data.UpdateElementTitle.Title != newTitle {
+		t.Errorf("Expected title %q, got %q", newTitle, data.UpdateElementTitle.Title)
+	}
+
+	verifyQuery := `
+		query Element($uri: ID!) {
+			element(uri: $uri) { uri title }
+		}
+	`
+	verifyResp := executeGraphQL(t, verifyQuery, map[string]any{"uri": "element:test-2"})
+
+	if len(verifyResp.Errors) > 0 {
+		t.Fatalf("GraphQL errors on verify: %v", verifyResp.Errors)
+	}
+
+	verifyData := struct {
+		Element *model.Element `json:"element"`
+	}{}
+
+	if err := json.Unmarshal(verifyResp.Data, &verifyData); err != nil {
+		t.Fatalf("Failed to unmarshal verify data: %v", err)
+	}
+
+	if verifyData.Element.Title != newTitle {
+		t.Errorf("Expected persisted title %q, got %q", newTitle, verifyData.Element.Title)
+	}
+}
