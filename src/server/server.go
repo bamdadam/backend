@@ -23,7 +23,7 @@ import (
 )
 
 func Run(ctx context.Context, db *pgxpool.Pool, addr string) error {
-	graphqlHandler := newGraphQLHandler(db)
+	graphqlHandler := NewGraphQLHandler(db)
 	healthHandler := newHealthHandler(db)
 
 	http.Handle("/", playground.Handler("GraphQL Playground", "/graphql"))
@@ -51,7 +51,7 @@ func Run(ctx context.Context, db *pgxpool.Pool, addr string) error {
 	return server.Shutdown(shutdownCtx)
 }
 
-func newGraphQLHandler(db *pgxpool.Pool) http.Handler {
+func NewGraphQLHandler(db *pgxpool.Pool) http.Handler {
 	userRepo := repository.NewUserRepository(db)
 	tenantRepo := repository.NewTenantRepository(db)
 	spaceRepo := repository.NewSpaceRepository(db, tenantRepo)
