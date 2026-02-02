@@ -91,6 +91,7 @@ func setupTestData(ctx context.Context) error {
 		fmt.Sprintf(`INSERT INTO elements (uri, title, type_uri, space_uri, creation_date, author) VALUES ('element:test-1', 'Test Element 1', 'type:test-1', 'space:test-1', %d, '%s') ON CONFLICT (uri) DO NOTHING`, now, testUserID),
 		fmt.Sprintf(`INSERT INTO elements (uri, title, type_uri, space_uri, creation_date, author) VALUES ('element:test-2', 'Test Element 2', 'type:test-1', 'space:test-1', %d, '%s') ON CONFLICT (uri) DO NOTHING`, now, testUserID),
 		fmt.Sprintf(`INSERT INTO elements (uri, title, type_uri, space_uri, creation_date, author) VALUES ('element:test-3', 'Test Element 3', 'type:test-1', 'space:test-2', %d, '%s') ON CONFLICT (uri) DO NOTHING`, now, testUserID),
+		fmt.Sprintf(`INSERT INTO elements (uri, title, type_uri, space_uri, creation_date, author) VALUES ('element:test-4', 'Test Element 4', 'type:test-1', 'space:test-1', %d, '%s') ON CONFLICT (uri) DO NOTHING`, now, testUserID),
 
 		fmt.Sprintf(`INSERT INTO element_field_values (uri, element_uri, field_uri, value_text, value_number, value_date, value_boolean, value_json, creation_date, updated_date) VALUES ('efv:test-1-1', 'element:test-1', 'field:test-1', 'Hello World', null, null, null, null, %d, %d) ON CONFLICT (uri) DO NOTHING`, now, now),
 		fmt.Sprintf(`INSERT INTO element_field_values (uri, element_uri, field_uri, value_text, value_number, value_date, value_boolean, value_json, creation_date, updated_date) VALUES ('efv:test-1-2', 'element:test-1', 'field:test-2', 'option1', null, null, null, null, %d, %d) ON CONFLICT (uri) DO NOTHING`, now, now),
@@ -98,6 +99,9 @@ func setupTestData(ctx context.Context) error {
 
 		fmt.Sprintf(`INSERT INTO element_field_values (uri, element_uri, field_uri, value_text, value_number, value_date, value_boolean, value_json, creation_date, updated_date) VALUES ('efv:test-2-1', 'element:test-2', 'field:test-1', 'Another text value', null, null, null, null, %d, %d) ON CONFLICT (uri) DO NOTHING`, now, now),
 		fmt.Sprintf(`INSERT INTO element_field_values (uri, element_uri, field_uri, value_text, value_number, value_date, value_boolean, value_json, creation_date, updated_date) VALUES ('efv:test-2-3', 'element:test-2', 'field:test-3', null, 100, null, null, null, %d, %d) ON CONFLICT (uri) DO NOTHING`, now, now),
+
+		fmt.Sprintf(`INSERT INTO element_field_values (uri, element_uri, field_uri, value_text, value_number, value_date, value_boolean, value_json, creation_date, updated_date) VALUES ('efv:test-4-2', 'element:test-4', 'field:test-2', 'option1', null, null, null, null, %d, %d) ON CONFLICT (uri) DO NOTHING`, now, now),
+		fmt.Sprintf(`INSERT INTO element_field_values (uri, element_uri, field_uri, value_text, value_number, value_date, value_boolean, value_json, creation_date, updated_date) VALUES ('efv:test-4-3', 'element:test-4', 'field:test-3', null, 555, null, null, null, %d, %d) ON CONFLICT (uri) DO NOTHING`, now, now),
 	}
 
 	for _, q := range queries {
@@ -212,6 +216,10 @@ func TestElementsQuery(t *testing.T) {
 		t.Errorf("Expected at least 1 element, got %d", data.ElementConnection.TotalCount)
 	}
 
+	if data.ElementConnection.TotalCount > 3 {
+		t.Errorf("Expected at most 3 element, got %d", data.ElementConnection.TotalCount)
+	}
+
 	if len(data.ElementConnection.Edges) < 1 {
 		t.Errorf("Expected at least 1 edge, got %d", len(data.ElementConnection.Edges))
 	}
@@ -232,6 +240,13 @@ func TestElementsQuery(t *testing.T) {
 		}
 		if first.Author.URI == "" {
 			t.Error("Expected author URI to be non-empty")
+		}
+	}
+
+	for _, node := range data.ElementConnection.Edges {
+		elem := node.Node
+		if elem.URI == "element:test-3" {
+			t.Error("Expected 3rd Element to get filtered out")
 		}
 	}
 }

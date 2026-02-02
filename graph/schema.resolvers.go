@@ -14,12 +14,7 @@ import (
 
 // UpdateElementTitle is the resolver for the updateElementTitle field.
 func (r *mutationResolver) UpdateElementTitle(ctx context.Context, input model.UpdateElementTitleInput) (*model.Element, error) {
-	elem, err := r.ElementService.UpdateTitle(ctx, input.URI, input.Title)
-	if err != nil {
-		return nil, err
-	}
-	r.ElementPubSub.Publish(elem)
-	return elem, nil
+	return r.ElementService.UpdateTitle(ctx, input.URI, input.Title)
 }
 
 // Element is the resolver for the element field.
@@ -49,14 +44,7 @@ func (r *queryResolver) Elements(ctx context.Context,
 
 // ElementUpdated is the resolver for the elementUpdated field.
 func (r *subscriptionResolver) ElementUpdated(ctx context.Context, uri string) (<-chan *model.Element, error) {
-	ch := r.ElementPubSub.Subscribe(uri)
-
-	go func() {
-		<-ctx.Done()
-		r.ElementPubSub.Unsubscribe(uri, ch)
-	}()
-
-	return ch, nil
+	return r.ElementService.UpdateElementSubscribe(ctx, uri)
 }
 
 // Mutation returns MutationResolver implementation.

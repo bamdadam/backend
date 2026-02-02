@@ -59,13 +59,16 @@ func NewGraphQLHandler(db *pgxpool.Pool) http.Handler {
 	fieldRepo := repository.NewFieldRepository(db, typeRepo, userRepo)
 	fieldValueRepo := repository.NewElementFieldValueRepository(db, fieldRepo)
 	userSpaceRepo := repository.NewUserSpacesRepository(db)
-	elementRepo := repository.NewElementRepository(db, typeRepo, spaceRepo, userRepo, fieldValueRepo, userSpaceRepo)
+	elementRepo := repository.NewElementRepository(db)
 
-	elementService := service.NewElementService(db, elementRepo)
+	elementPubSub := pubsub.NewElementPubSub()
+
+	userService := service.NewUserService(db, userRepo, userSpaceRepo)
+	elementService := service.NewElementService(db, userService, elementRepo, typeRepo, spaceRepo, fieldValueRepo, elementPubSub)
 
 	resolver := &graph.Resolver{
 		ElementService: elementService,
-		ElementPubSub:  pubsub.NewElementPubSub(),
+		ElementPubSub:  elementPubSub,
 	}
 
 	srv := handler.New(graph.NewExecutableSchema(

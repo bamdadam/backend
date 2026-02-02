@@ -13,3 +13,14 @@ type ListParams struct {
 	SpaceURI         *string
 	FieldValueFilter *model.FieldValueFilter
 }
+
+type LoadRelationParams struct {
+	TypeURI,
+	SpaceURI,
+	AuthorURI string
+}
+
+type ElemWithRelation struct {
+	*model.Element
+	LoadRelationParams
+}
